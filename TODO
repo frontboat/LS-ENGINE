@@ -1,0 +1,4 @@
+Make route naming more logical and composable
+Make data providing more granular
+
+thoughts: maybe just a single endpoint, and customize from that? Every single db entry could then be added, fully customizable context creation

@@ -15,7 +15,7 @@ import { ItemEntity } from './src/entities/ItemEntity';
 // Environment configuration
 const config: IndexerConfig = {
   toriiUrl: process.env.TORII_URL || 'https://api.cartridge.gg/x/pg-sepolia/torii',
-  namespace: process.env.NAMESPACE || 'ls_0_0_6',
+  namespace: process.env.NAMESPACE || 'ls_0_0_8',
   rpcUrl: process.env.RPC_URL || 'https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9'
 };
 
@@ -33,8 +33,8 @@ const gameContext = new GameContext(indexer);
 // Health check
 app.get('/', (c) => {
   return c.json({
-    name: 'Death Mountain Context Engine',
-    version: '1.0.0',
+    name: 'Loot Survivor 2 Context Engine',
+    version: '1.0.1',
     status: 'online',
     config: {
       namespace: config.namespace,

@@ -1,126 +1,73 @@
-# Death Mountain Context Engine
+# Loot Survivor 2 Context Engine
 
-A modular, class-based context preparation engine for the Death Mountain game. This server provides rich game data processing, combat simulation, and entity management through a clean API.
-
-## Architecture
-
-The engine uses a granular class-based architecture with:
-
-- **Entity Classes**: Encapsulate game entities (Adventurer, Beast, Item) with lazy loading and caching
-- **Systems**: High-level orchestration (Combat, Market, Game Context)
-- **Indexer Client**: Direct SQL queries to Torii blockchain indexer
-- **Chainable API**: Fluent interface for complex operations
+Modular context preparation engine for Loot Survivor 2. Provides game data processing, combat simulation, and entity management through a clean API.
 
 ## Quick Start
 
 ```bash
-# Install dependencies
+# Install and run
 bun install
-
-# Set environment variables
 export TORII_URL=https://api.cartridge.gg/x/pg-sepolia/torii
-export NAMESPACE=ls_0_0_6
-export PORT=3000
-
-# Run the server
+export NAMESPACE=ls_0_0_8
 bun run index.ts
-
-# Run with hot reload
-bun --hot index.ts
 ```
 
 ## API Endpoints
 
 ### Game Context
-- `GET /game/:id/context` - Full game context with adventurer, beast, market
-- `GET /game/:id/combat-ready` - Adventurer with combat stats loaded
-- `GET /game/:id/market` - Market analysis with recommendations
+- `GET /game/:id/context` - Full game state
+- `GET /game/:id/combat-ready` - Combat-ready adventurer
+- `GET /game/:id/market` - Market analysis
 
 ### Entities
-- `GET /adventurer/:gameId` - Adventurer details with equipment
-- `GET /beast/:id` - Beast details with rewards
-- `GET /item/:id?xp=0&seed=0` - Item details with specials
+- `GET /adventurer/:gameId` - Adventurer with equipment
+- `GET /beast/:id` - Beast with rewards
+- `GET /item/:id?xp=0&seed=0` - Item with specials
 
 ### Combat
-- `POST /combat/simulate` - Simulate combat round
-- `POST /calculate/damage` - Calculate damage between entities
+- `POST /combat/simulate` - Simulate combat
+- `POST /calculate/damage` - Calculate damage
 
 ### Other
 - `GET /leaderboard?limit=10` - Top adventurers
-- `POST /query` - Raw SQL query (debugging)
+- `POST /query` - Raw SQL (debug only)
 
-## Usage Examples
+## Usage Example
 
-### Get Game Context
 ```bash
+# Get game context
 curl http://localhost:3000/game/123/context
-```
 
-### Simulate Combat
-```bash
+# Simulate combat
 curl -X POST http://localhost:3000/combat/simulate \
   -H "Content-Type: application/json" \
   -d '{"gameId": 123, "beastId": 45}'
 ```
 
-### Get Item with Specials
-```bash
-curl http://localhost:3000/item/42?xp=100&seed=12345
-```
-
-## Architecture Details
-
-### Entity Pattern
-```typescript
-const adventurer = new AdventurerEntity(indexer);
-await adventurer.fetch(gameId);
-await adventurer.withEquipment();
-const damage = adventurer.calculateDamageVsBeast(beast);
-```
-
-### Chaining Operations
-```typescript
-const context = await gameContext
-  .getGameContext(123)
-  .withCombatAnalysis()
-  .withMarketRecommendations();
-```
-
-### Caching Strategy
-Entities cache computed values to avoid recalculation:
-- Level calculations
-- Name generation with specials
-- Combat stats
-- Type determinations
-
 ## Project Structure
+
 ```
-context-engine/
-├── src/
-│   ├── core/          # Base classes (Entity)
-│   ├── entities/      # Game entities (Adventurer, Beast, Item)
-│   ├── systems/       # High-level systems (Combat, GameContext)
-│   ├── indexer/       # Torii client
-│   ├── types/         # TypeScript types
-│   ├── constants/     # Game constants (from client)
-│   └── utils/         # Helper functions
-└── index.ts           # Hono API server
+src/
+├── core/          # Base classes
+├── entities/      # Game entities
+├── systems/       # High-level systems
+├── indexer/       # Torii client
+├── constants/     # Game constants
+└── utils/         # Helpers
 ```
 
-## Features
+## Architecture
 
-- **Granular Control**: Each entity handles its own data fetching
-- **Lazy Loading**: Only fetch what you need when you need it
-- **Type Safety**: Full TypeScript with proper types
-- **Performance**: Built-in caching at entity level
-- **Testable**: Each class can be mocked independently
-- **Composable**: Combine entities for complex features
+- **Entities**: Encapsulated game objects (Adventurer, Beast, Item) with lazy loading
+- **Systems**: High-level orchestration (Combat, GameContext)  
+- **Indexer**: Direct SQL queries to Torii blockchain indexer
+- **Caching**: Computed values cached at entity level
 
 ## Environment Variables
 
-- `TORII_URL`: Torii indexer URL (default: Sepolia testnet)
-- `NAMESPACE`: Game namespace (default: ls_0_0_6)
+- `TORII_URL`: Torii indexer URL
+- `NAMESPACE`: Game namespace (default: ls_0_0_8)
 - `RPC_URL`: StarkNet RPC endpoint
 - `PORT`: Server port (default: 3000)
 
-This project was created using `bun init` in bun v1.2.18. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+Built with [Bun](https://bun.sh).
