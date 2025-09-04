@@ -15,7 +15,7 @@ import { ItemEntity } from './src/entities/ItemEntity';
 // Environment configuration
 const config: IndexerConfig = {
   toriiUrl: process.env.TORII_URL || 'https://api.cartridge.gg/x/pg-sepolia/torii',
-  namespace: process.env.NAMESPACE || 'ls_0_0_8',
+  namespace: process.env.NAMESPACE || 'ls_0_0_6',
   rpcUrl: process.env.RPC_URL || 'https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9'
 };
 
@@ -87,22 +87,27 @@ app.get('/game/:id/context', async (c) => {
   try {
     const gameId = parseInt(c.req.param('id'));
     const context = await gameContext.getGameContext(gameId);
+
+    // Optional filtering via include=query,param list (e.g., include=game,adventurer,currentBeast)
+    const includeParam = c.req.query('include');
+    if (includeParam) {
+      const allowed = new Set(includeParam.split(',').map(s => s.trim()).filter(Boolean));
+      const filtered: Record<string, any> = {};
+      for (const key of ['game', 'adventurer', 'currentBeast', 'damagePreview', 'market', 'recentEvents']) {
+        if (allowed.has(key) && (context as any)[key] !== undefined) {
+          (filtered as any)[key] = (context as any)[key];
+        }
+      }
+      return c.json(filtered);
+    }
+
     return c.json(context);
   } catch (error: any) {
     return c.json({ error: error.message }, 404);
   }
 });
 
-// Get combat-ready adventurer
-app.get('/game/:id/combat-ready', async (c) => {
-  try {
-    const gameId = parseInt(c.req.param('id'));
-    const data = await gameContext.getAdventurerCombatReady(gameId);
-    return c.json(data);
-  } catch (error: any) {
-    return c.json({ error: error.message }, 404);
-  }
-});
+// removed deprecated alias endpoint: /game/:id/combat-ready
 
 // Simulate combat
 app.post('/combat/simulate', async (c) => {
@@ -115,38 +120,13 @@ app.post('/combat/simulate', async (c) => {
   }
 });
 
-// Get market analysis
-app.get('/game/:id/market', async (c) => {
-  try {
-    const gameId = parseInt(c.req.param('id'));
-    const analysis = await gameContext.getMarketAnalysis(gameId);
-    return c.json(analysis);
-  } catch (error: any) {
-    return c.json({ error: error.message }, 404);
-  }
-});
+// removed deprecated alias endpoint: /game/:id/market
 
 // ============================================
 // Entity Routes
 // ============================================
 
-// Get adventurer
-app.get('/adventurer/:gameId', async (c) => {
-  try {
-    const gameId = parseInt(c.req.param('gameId'));
-    const adventurer = new AdventurerEntity(indexer);
-    await adventurer.fetch(gameId);
-    await adventurer.withEquipment();
-    
-    return c.json({
-      raw: adventurer.getRaw(),
-      formatted: adventurer.format(),
-      combatStats: adventurer.getCombatStats()
-    });
-  } catch (error: any) {
-    return c.json({ error: error.message }, 404);
-  }
-});
+// removed deprecated endpoint: /adventurer/:gameId
 
 // Get beast
 app.get('/beast/:id', async (c) => {
@@ -202,37 +182,7 @@ app.get('/item/:id', async (c) => {
 // Calculation Routes
 // ============================================
 
-// Calculate damage
-app.post('/calculate/damage', async (c) => {
-  try {
-    const { gameId, beastId } = await c.req.json();
-    
-    const adventurer = new AdventurerEntity(indexer);
-    await adventurer.fetch(gameId);
-    await adventurer.withEquipment();
-    
-    const beast = new BeastEntity(indexer);
-    await beast.fetch(beastId);
-    
-    const damage = adventurer.calculateDamageVsBeast(beast);
-    
-    return c.json({
-      damage,
-      adventurer: {
-        level: adventurer.getLevel(),
-        weapon: adventurer.getWeapon()?.format()
-      },
-      beast: {
-        name: beast.getName(),
-        level: beast.getLevel(),
-        tier: beast.getTier(),
-        armor: beast.getArmorType()
-      }
-    });
-  } catch (error: any) {
-    return c.json({ error: error.message }, 400);
-  }
-});
+// removed calculation endpoint: /calculate/damage (use context.damagePreview or /combat/simulate)
 
 // ============================================
 // Leaderboard Routes

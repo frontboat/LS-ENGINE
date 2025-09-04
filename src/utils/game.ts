@@ -88,7 +88,7 @@ export const ability_based_damage_reduction = (adventurer_xp: number, relevant_s
 
 export const strength_dmg = (damage: number, strength: number): number => {
   if (strength === 0) return 0;
-  return Math.floor((damage * strength * 10) / 100);
+  return (damage * strength * 10) / 100;
 };
 
 // Critical hit bonus calculation
@@ -119,15 +119,16 @@ export const calculateFleeChance = (adventurerLevel: number, dexterity: number):
   if (dexterity >= adventurerLevel) {
     return 100;
   }
-  return (dexterity / adventurerLevel) * 100;
+  return Math.floor((dexterity / adventurerLevel) * 100);
 };
 
 // Calculate ambush chance based on wisdom
+// Chance to avoid ambush (client parity via ability_based_percentage)
 export const calculateAmbushChance = (adventurerLevel: number, wisdom: number): number => {
   if (wisdom >= adventurerLevel) {
-    return 0; // No ambush if wisdom is high enough
+    return 100;
   }
-  return ((adventurerLevel - wisdom) / adventurerLevel) * 100;
+  return Math.floor((wisdom / adventurerLevel) * 100);
 };
 
 // Calculate discovery chance based on intelligence

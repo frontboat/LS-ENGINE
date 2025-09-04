@@ -8,25 +8,23 @@ Modular context preparation engine for Loot Survivor 2. Provides game data proce
 # Install and run
 bun install
 export TORII_URL=https://api.cartridge.gg/x/pg-sepolia/torii
-export NAMESPACE=ls_0_0_8
+export NAMESPACE=ls_0_0_6
 bun run index.ts
 ```
 
 ## API Endpoints
 
 ### Game Context
-- `GET /game/:id/context` - Full game state
-- `GET /game/:id/combat-ready` - Combat-ready adventurer
-- `GET /game/:id/market` - Market analysis
+- `GET /game/:id/context` – Full game snapshot
+  - Includes: `game`, `adventurer` (formatted + combatStats), `currentBeast` (when in battle), `damagePreview`, `market`, `recentEvents` (unified activity feed)
+  - Filtering: `?include=game,adventurer,currentBeast,damagePreview,market,recentEvents`
 
 ### Entities
-- `GET /adventurer/:gameId` - Adventurer with equipment
-- `GET /beast/:id` - Beast with rewards
-- `GET /item/:id?xp=0&seed=0` - Item with specials
+- `GET /beast/:id` – Beast with rewards (use formatted fields)
+- `GET /item/:id?xp=0&seed=0` – Item with derived name/specials/price
 
 ### Combat
-- `POST /combat/simulate` - Simulate combat
-- `POST /calculate/damage` - Calculate damage
+- `POST /combat/simulate` – Simulate a combat round (RNG crits/outcomes)
 
 ### Other
 - `GET /leaderboard?limit=10` - Top adventurers
@@ -35,13 +33,39 @@ bun run index.ts
 ## Usage Example
 
 ```bash
-# Get game context
+# Get game context (full)
 curl http://localhost:3000/game/123/context
 
-# Simulate combat
+# Get selected sections
+curl "http://localhost:3000/game/123/context?include=game,adventurer,currentBeast,damagePreview,recentEvents"
+
+# Simulate combat round
 curl -X POST http://localhost:3000/combat/simulate \
   -H "Content-Type: application/json" \
   -d '{"gameId": 123, "beastId": 45}'
+```
+
+## Unified Activity Feed
+
+- `recentEvents` merges multiple sources into a single, sorted feed (newest first):
+  - Action events from `GameEvent` (e.g., BeastDefeated, Discovery, Obstacle, LevelUp, Purchase/Equip/Drop)
+  - Snapshots from `AdventurerPacked` and `BagPacked`
+- Each entry includes:
+  - `kind`, `at`, optional `actionCount`
+  - `data` (concise summary) and `message` (human-readable)
+  - `meta` with on-chain identifiers (blockNumber, txHash, eventIndex when available)
+
+Examples of messages:
+- "Defeated Chupacabra: +4 XP, +1 gold"
+- "Discovered gold: +3"
+- "Adventurer snapshot", "Bag snapshot"
+
+## Smoke Test
+
+Run a local smoke test against all endpoints and write results to a log file:
+
+```bash
+bun run scripts/smoke.ts --id 101 --base http://localhost:3000 --out logs/smoke.json
 ```
 
 ## Project Structure
@@ -66,7 +90,7 @@ src/
 ## Environment Variables
 
 - `TORII_URL`: Torii indexer URL
-- `NAMESPACE`: Game namespace (default: ls_0_0_8)
+- `NAMESPACE`: Game namespace (default: ls_0_0_6)
 - `RPC_URL`: StarkNet RPC endpoint
 - `PORT`: Server port (default: 3000)
 

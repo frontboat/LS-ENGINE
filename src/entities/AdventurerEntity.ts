@@ -142,14 +142,16 @@ export class AdventurerEntity extends Entity<RawAdventurer, FormattedAdventurer>
       
       // Base attack from weapon
       let attack = MIN_DAMAGE;
+      let baseAttack = MIN_DAMAGE;
       if (weapon) {
         const weaponLevel = weapon.getLevel();
         const weaponTier = weapon.getTier();
-        attack = weaponLevel * (6 - weaponTier);
+        baseAttack = weaponLevel * (6 - weaponTier);
+        attack = baseAttack;
       }
       
-      // Add strength bonus
-      const strengthBonus = Math.floor(attack * stats.strength / 10);
+      // Add strength bonus (client uses floor((base * strength * 10) / 100) when no beast)
+      const strengthBonus = Math.floor((attack * stats.strength * 10) / 100);
       attack += strengthBonus;
       
       // Calculate defense from armor
@@ -162,12 +164,11 @@ export class AdventurerEntity extends Entity<RawAdventurer, FormattedAdventurer>
         }
       }
       
-      // Calculate crit chance based on luck
-      const level = this.getLevel();
-      const critChance = Math.min(100, (stats.luck / level) * 100);
+      // Crit chance matches client: direct luck value (0-100 scale)
+      const critChance = stats.luck;
       
-      // Critical damage is 2x base
-      const critDamage = attack * 2;
+      // Critical damage (no beast): (baseAttack * 2) + strengthBonus
+      const critDamage = (baseAttack * 2) + strengthBonus;
       
       return {
         attack,

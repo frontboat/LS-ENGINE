@@ -6,6 +6,9 @@
 import { AdventurerEntity } from "../entities/AdventurerEntity";
 import { BeastEntity } from "../entities/BeastEntity";
 import type { CombatResult, DamageCalculation } from "../types/game";
+import { elementalAdjustedDamage } from "../utils/game";
+import { ItemEntity } from "../entities/ItemEntity";
+import { BEAST_MIN_DAMAGE } from "../constants/beast";
 
 export class CombatSystem {
   constructor(
@@ -86,19 +89,23 @@ export class CombatSystem {
   calculateBeastDamage(): number {
     const beastLevel = this.beast.getLevel();
     const beastTier = this.beast.getTier();
-    const baseDamage = Math.max(2, beastLevel * (6 - beastTier)); // Min 2 damage
-    
-    // Get adventurer's defense
-    const combatStats = this.adventurer.getCombatStats();
-    const defense = combatStats.defense;
-    
-    // Apply armor reduction
-    const damage = Math.max(2, baseDamage - defense);
-    
-    // Check for critical hit (beasts have base 10% crit chance)
-    const isCritical = Math.random() < 0.1;
-    
-    return isCritical ? damage * 2 : damage;
+    const maxDamage = beastLevel * (6 - beastTier) * 1.5;
+
+    // Sum defense across armor slots using client logic
+    let totalDefense = 0;
+
+    const armorSlots: Array<keyof ReturnType<AdventurerEntity['getEquippedItem']> | string> = ['head', 'chest', 'waist', 'hand', 'foot'];
+
+    for (const slot of armorSlots) {
+      const armor = this.adventurer.getEquippedItem(String(slot));
+      if (!armor) continue;
+      const damageAgainstArmor = this.calculateBeastDamageAgainstArmor(armor);
+      const armorDefense = Math.max(0, maxDamage - damageAgainstArmor);
+      totalDefense += armorDefense;
+    }
+
+    const reduced = Math.max(BEAST_MIN_DAMAGE, Math.floor(maxDamage - totalDefense));
+    return reduced;
   }
   
   /**
@@ -129,11 +136,67 @@ export class CombatSystem {
   
   private determineRoundOutcome(
     adventurerAttack: CombatResult,
-    beastAttack: { outcome: string } | null
+    beastAttack: { damage: number; remainingHealth: number; outcome: string } | null
   ): 'victory' | 'defeat' | 'ongoing' {
     if (adventurerAttack.outcome === 'victory') return 'victory';
     if (beastAttack?.outcome === 'defeat') return 'defeat';
     return 'ongoing';
+  }
+
+  /**
+   * Calculate beast damage against a single armor item (client parity)
+   */
+  private calculateBeastDamageAgainstArmor(armor: ItemEntity): number {
+    const beastLevel = this.beast.getLevel();
+    const beastTier = this.beast.getTier();
+    let damage = beastLevel * (6 - beastTier);
+
+    // Apply elemental adjustment (beast attack type vs armor type)
+    const beastAttackType = this.getBeastAttackType();
+    const armorType = armor.getType();
+    damage = elementalAdjustedDamage(damage, beastAttackType, armorType);
+
+    // Apply name match bonus (item specials vs beast specials)
+    const beastSpecials = this.beast.getSpecials();
+    const itemSpecials = armor.format().specials;
+    if (itemSpecials && (beastSpecials.prefix || beastSpecials.suffix)) {
+      if (itemSpecials.suffix && beastSpecials.suffix && itemSpecials.suffix === beastSpecials.suffix) {
+        damage *= 2; // Suffix match
+      }
+      if (itemSpecials.prefix && beastSpecials.prefix && itemSpecials.prefix === beastSpecials.prefix) {
+        damage *= 8; // Prefix match
+      }
+    }
+
+    // Subtract armor value
+    const armorLevel = armor.getLevel();
+    const armorValue = armorLevel * (6 - armor.getTier());
+    damage = Math.max(BEAST_MIN_DAMAGE, damage - armorValue);
+
+    // Neck reduction bonus
+    const neck = this.adventurer.getEquippedItem('neck');
+    if (neck && this.neckReductionApplies(armor.getType(), neck.getName())) {
+      const neckLevel = neck.getLevel();
+      damage -= Math.floor((armorLevel * (6 - armor.getTier()) * neckLevel * 3) / 100);
+    }
+
+    return Math.max(BEAST_MIN_DAMAGE, damage);
+  }
+
+  private neckReductionApplies(armorType: string, neckName: string): boolean {
+    if (!armorType || !neckName) return false;
+    if (armorType === 'Cloth' && neckName.includes('Amulet')) return true;
+    if (armorType === 'Hide' && neckName.includes('Pendant')) return true;
+    if (armorType === 'Metal' && neckName.includes('Necklace')) return true;
+    return false;
+  }
+
+  private getBeastAttackType(): string {
+    const id = this.beast.getRaw()?.id || 0;
+    if (id >= 1 && id <= 25) return 'Magic';
+    if (id >= 26 && id <= 50) return 'Blade';
+    if (id >= 51 && id <= 75) return 'Bludgeon';
+    return 'None';
   }
 }
 

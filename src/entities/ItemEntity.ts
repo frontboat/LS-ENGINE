@@ -6,7 +6,7 @@
 import { Entity } from "../core/Entity";
 import type { IndexerClient } from "../indexer/IndexerClient";
 import type { RawItem, FormattedItem, ItemType, Tier } from "../types/game";
-import { ItemId, ItemIndex, ItemSlotLength, ITEM_NAME_PREFIXES, ITEM_NAME_SUFFIXES, PREFIXES_UNLOCK_GREATNESS, SUFFIX_UNLOCK_GREATNESS } from "../constants/loot";
+import { ItemId, ItemIndex, ItemSlotLength, ITEM_NAME_PREFIXES, ITEM_NAME_SUFFIXES, PREFIXES_UNLOCK_GREATNESS, SUFFIX_UNLOCK_GREATNESS, NUM_ITEMS } from "../constants/loot";
 import { TIER_PRICE } from "../constants/game";
 import { calculateLevel } from "../utils/game";
 
@@ -208,7 +208,31 @@ export class ItemEntity extends Entity<RawItem, FormattedItem> {
     if (itemEntropy > 65535) {
       itemEntropy = entropy - id;
     }
-    return itemEntropy % 101; // NUM_ITEMS
+
+    // Scope rnd between 0 and NUM_ITEMS-1
+    const rnd = itemEntropy % NUM_ITEMS;
+
+    // Get item name and index
+    const entry = Object.entries(ItemId).find(([_, value]) => value === id);
+    const itemName = entry ? entry[0] : undefined;
+    const itemIndex = itemName ? (ItemIndex as any)[itemName] || 0 : 0;
+
+    // Get slot length based on item slot
+    const slot = this.calculateSlot(id);
+    let slotLength = 1;
+    switch (slot) {
+      case "Weapon": slotLength = ItemSlotLength.SlotItemsLengthWeapon; break;
+      case "Chest": slotLength = ItemSlotLength.SlotItemsLengthChest; break;
+      case "Head": slotLength = ItemSlotLength.SlotItemsLengthHead; break;
+      case "Waist": slotLength = ItemSlotLength.SlotItemsLengthWaist; break;
+      case "Foot": slotLength = ItemSlotLength.SlotItemsLengthFoot; break;
+      case "Hand": slotLength = ItemSlotLength.SlotItemsLengthHand; break;
+      case "Neck": slotLength = ItemSlotLength.SlotItemsLengthNeck; break;
+      case "Ring": slotLength = ItemSlotLength.SlotItemsLengthRing; break;
+    }
+
+    // Return the item specific entropy
+    return rnd * slotLength + itemIndex;
   }
   
   private getSpecialPrefix(seed: number): string | undefined {
