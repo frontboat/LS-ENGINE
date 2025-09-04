@@ -6,10 +6,15 @@ Minimal API for deriving game state, combat math, and activity from Torii.
 
 ```bash
 bun install
-export TORII_URL=https://api.cartridge.gg/x/pg-sepolia/torii
-export NAMESPACE=ls_0_0_6
 bun run index.ts
 ```
+
+Defaults to
+```bash
+export TORII_URL=https://api.cartridge.gg/x/pg-sepolia/torii
+export NAMESPACE=ls_0_0_6
+```
+
 
 ## Endpoints
 
