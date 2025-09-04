@@ -1,97 +1,47 @@
 # Loot Survivor 2 Context Engine
 
-Modular context preparation engine for Loot Survivor 2. Provides game data processing, combat simulation, and entity management through a clean API.
+Minimal API for deriving game state, combat math, and activity from Torii.
 
-## Quick Start
+## Quick start
 
 ```bash
-# Install and run
 bun install
 export TORII_URL=https://api.cartridge.gg/x/pg-sepolia/torii
 export NAMESPACE=ls_0_0_6
 bun run index.ts
 ```
 
-## API Endpoints
+## Endpoints
 
-### Game Context
-- `GET /game/:id/context` – Full game snapshot
-  - Includes: `game`, `adventurer` (formatted + combatStats), `currentBeast` (when in battle), `damagePreview`, `market`, `recentEvents` (unified activity feed)
-  - Filtering: `?include=game,adventurer,currentBeast,damagePreview,market,recentEvents`
+- `GET /game/:id/context`
+  - Sections: `game`, `adventurer` (with `combatStats`), `currentBeast`, `damagePreview`, `market`, `recentEvents`
+  - Filter with `?include=game,adventurer,currentBeast,damagePreview,market,recentEvents`
+- `POST /combat/simulate` – One combat round (RNG crits/outcomes)
+- `GET /beast/:id` – Beast formatted + rewards
+- `GET /item/:id?xp=0&seed=0` – Item formatted + derived specials/price
+- `GET /leaderboard?limit=10`
+- `POST /query` – Raw SQL (debug)
 
-### Entities
-- `GET /beast/:id` – Beast with rewards (use formatted fields)
-- `GET /item/:id?xp=0&seed=0` – Item with derived name/specials/price
+## Context details
 
-### Combat
-- `POST /combat/simulate` – Simulate a combat round (RNG crits/outcomes)
+- `adventurer.combatStats`: generic (target-agnostic) attack/defense/crit
+- `currentBeast`: only when in battle
+- `damagePreview`: your damage vs current beast; includes `incoming` per-slot damage taken and protection%
+- `recentEvents`: unified feed (newest first) from `GameEvent` + packed snapshots (`AdventurerPacked`, `BagPacked`); each entry has `kind`, `at`, concise `data`, human `message`, and on-chain `meta`
 
-### Other
-- `GET /leaderboard?limit=10` - Top adventurers
-- `POST /query` - Raw SQL (debug only)
+Example messages: “Defeated Chupacabra: +4 XP, +1 gold”, “Discovered gold: +3”, “Adventurer snapshot”.
 
-## Usage Example
-
-```bash
-# Get game context (full)
-curl http://localhost:3000/game/123/context
-
-# Get selected sections
-curl "http://localhost:3000/game/123/context?include=game,adventurer,currentBeast,damagePreview,recentEvents"
-
-# Simulate combat round
-curl -X POST http://localhost:3000/combat/simulate \
-  -H "Content-Type: application/json" \
-  -d '{"gameId": 123, "beastId": 45}'
-```
-
-## Unified Activity Feed
-
-- `recentEvents` merges multiple sources into a single, sorted feed (newest first):
-  - Action events from `GameEvent` (e.g., BeastDefeated, Discovery, Obstacle, LevelUp, Purchase/Equip/Drop)
-  - Snapshots from `AdventurerPacked` and `BagPacked`
-- Each entry includes:
-  - `kind`, `at`, optional `actionCount`
-  - `data` (concise summary) and `message` (human-readable)
-  - `meta` with on-chain identifiers (blockNumber, txHash, eventIndex when available)
-
-Examples of messages:
-- "Defeated Chupacabra: +4 XP, +1 gold"
-- "Discovered gold: +3"
-- "Adventurer snapshot", "Bag snapshot"
-
-## Smoke Test
-
-Run a local smoke test against all endpoints and write results to a log file:
+## Smoke test
 
 ```bash
 bun run scripts/smoke.ts --id 101 --base http://localhost:3000 --out logs/smoke.json
 ```
 
-## Project Structure
+## Env
 
-```
-src/
-├── core/          # Base classes
-├── entities/      # Game entities
-├── systems/       # High-level systems
-├── indexer/       # Torii client
-├── constants/     # Game constants
-└── utils/         # Helpers
-```
+- `TORII_URL` (required)
+- `NAMESPACE` (default: ls_0_0_6)
+- `RPC_URL`
+- `PORT` (default: 3000)
 
-## Architecture
-
-- **Entities**: Encapsulated game objects (Adventurer, Beast, Item) with lazy loading
-- **Systems**: High-level orchestration (Combat, GameContext)  
-- **Indexer**: Direct SQL queries to Torii blockchain indexer
-- **Caching**: Computed values cached at entity level
-
-## Environment Variables
-
-- `TORII_URL`: Torii indexer URL
-- `NAMESPACE`: Game namespace (default: ls_0_0_6)
-- `RPC_URL`: StarkNet RPC endpoint
-- `PORT`: Server port (default: 3000)
-
-Built with [Bun](https://bun.sh).
+Built with Bun.
