@@ -11,9 +11,23 @@ import { CombatSystem } from "./CombatSystem";
 import { BEAST_NAMES } from "../constants/beast";
 import { elementalAdjustedDamage } from "../utils/game";
 import { BEAST_MIN_DAMAGE } from "../constants/beast";
+import { SimpleContextEngine } from "../context";
 
 export class GameContext {
-  constructor(private indexer: IndexerClient) {}
+  private contextEngine: SimpleContextEngine;
+
+  constructor(private indexer: IndexerClient) {
+    this.contextEngine = new SimpleContextEngine();
+  }
+  
+  /**
+   * Get LLM-ready context for intent prediction
+   */
+  async getLLMContext(gameId: number) {
+    const gameContext = await this.getGameContext(gameId);
+    const result = this.contextEngine.build(gameContext);
+    return result.content;
+  }
   
   /**
    * Get full game context for a specific game

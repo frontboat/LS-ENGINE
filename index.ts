@@ -11,6 +11,7 @@ import { GameContext } from './src/systems/GameContext';
 import { AdventurerEntity } from './src/entities/AdventurerEntity';
 import { BeastEntity } from './src/entities/BeastEntity';
 import { ItemEntity } from './src/entities/ItemEntity';
+import { SimpleContextEngine } from './src/context/SimpleContextEngine';
 
 // Environment configuration
 const config: IndexerConfig = {
@@ -82,8 +83,30 @@ app.get('/adventurers', async (c) => {
 // Game Context Routes
 // ============================================
 
-// Get full game context
+// Get LLM-ready context (XML format for agent frameworks)
 app.get('/game/:id/context', async (c) => {
+  try {
+    const gameId = parseInt(c.req.param('id'));
+    const gameState = await gameContext.getGameContext(gameId);
+    
+    // Generate compact XML context
+    const engine = new SimpleContextEngine();
+    const result = engine.build(gameState);
+    
+    // Return inline XML without newlines
+    c.header('Content-Type', 'application/xml');
+    const inlineXml = result.content.replace(/\n\s*/g, '');
+    
+    return c.text(inlineXml);
+  } catch (error: any) {
+    // Return error as inline XML
+    c.header('Content-Type', 'application/xml');
+    return c.text(`<error><message>${error.message}</message><gameId>${c.req.param('id')}</gameId></error>`, 404);
+  }
+});
+
+// Get full game context as JSON
+app.get('/game/:id/context-json', async (c) => {
   try {
     const gameId = parseInt(c.req.param('id'));
     const context = await gameContext.getGameContext(gameId);
