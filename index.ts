@@ -30,7 +30,7 @@ const contextEngine = new ContextEngine();
 app.get('/', (c) => {
   return c.json({
     name: 'Loot Survivor 2 Context Engine',
-    version: '1.0.1',
+    version: '1.0.3',
     status: 'online',
     config: {
       namespace: config.namespace,
@@ -68,10 +68,9 @@ app.get('/game/:id/context', async (c) => {
 // Start server
 const port = parseInt(process.env.PORT || '3000');
 
-console.log(`🗡️  Death Mountain Context Engine`);
-console.log(`📍 Starting on port ${port}`);
-console.log(`🔗 Torii: ${config.toriiUrl}`);
-console.log(`🏷️  Namespace: ${config.namespace}`);
+console.log(`Port: ${port}`);
+console.log(`Torii: ${config.toriiUrl}`);
+console.log(`Namespace: ${config.namespace}`);
 
 export default {
   port,
