@@ -1,57 +1,140 @@
-/**
- * Game utility functions
- * Core calculations for levels, XP, combat, and other game mechanics
- */
+import { BEAST_MIN_DAMAGE } from "../constants/beast";
+import { MIN_DAMAGE } from "../constants/game";
+import { Adventurer, Beast, CombatStats, Equipment, Item } from "../types/game";
+import { getArmorType, getAttackType } from "./beast";
+import { ItemType, ItemUtils } from "./loot";
 
-// Constants
-export const MIN_DAMAGE = 4;
-export const BEAST_MIN_DAMAGE = 2;
-
-export const calculateLevel = (xp: number): number => {
+export const calculateLevel = (xp: number) => {
   if (xp === 0) return 1;
   return Math.floor(Math.sqrt(xp));
 };
 
-export const calculateNextLevelXP = (currentLevel: number, item: boolean = false): number => {
+export const calculateNextLevelXP = (currentLevel: number, item: boolean = false) => {
   if (item) {
     return Math.min(400, (currentLevel + 1) ** 2);
   }
+
   return (currentLevel + 1) ** 2;
 };
 
-export const calculateProgress = (xp: number, item: boolean = false): number => {
+export const calculateProgress = (xp: number, item: boolean = false) => {
   const currentLevel = calculateLevel(xp);
   const nextLevelXP = calculateNextLevelXP(currentLevel, item);
   const currentLevelXP = currentLevel ** 2;
   return ((xp - currentLevelXP) / (nextLevelXP - currentLevelXP)) * 100;
 };
 
-// Correct elemental damage calculation from client
-export const elementalAdjustedDamage = (base_attack: number, weapon_type: string, armor_type: string): number => {
-  let elemental_effect = Math.floor(base_attack / 2);
+export const getNewItemsEquipped = (newEquipment: Equipment, oldEquipment: Equipment) => {
+  if (!newEquipment || !oldEquipment) return [];
 
-  // Strong against (1.5x damage)
-  if (
-    (weapon_type === "Magic" && armor_type === "Metal") ||
-    (weapon_type === "Blade" && armor_type === "Cloth") ||
-    (weapon_type === "Bludgeon" && armor_type === "Hide")
-  ) {
-    return base_attack + elemental_effect;
-  }
+  const newItems: Item[] = [];
 
-  // Weak against (0.5x damage)  
-  if (
-    (weapon_type === "Magic" && armor_type === "Hide") ||
-    (weapon_type === "Blade" && armor_type === "Metal") ||
-    (weapon_type === "Bludgeon" && armor_type === "Cloth")
-  ) {
-    return base_attack - elemental_effect;
-  }
+  // Check each equipment slot in the current adventurer
+  Object.entries(newEquipment).forEach(([slot, currentItem]) => {
+    const initialItem = oldEquipment[slot as keyof Equipment];
 
-  return base_attack;
+    // Only add if there's a current item and it's different from the initial item
+    if (currentItem.id !== 0 && currentItem.id !== initialItem.id) {
+      newItems.push(currentItem);
+    }
+  });
+
+  return newItems;
 };
 
-export const ability_based_percentage = (adventurer_xp: number, relevant_stat: number): number => {
+export const incrementBeastsCollected = (gameId: number) => {
+  let currentCount = parseInt(localStorage.getItem(`beast_collected_${gameId}`) || "0");
+  localStorage.setItem(`beast_collected_${gameId}`, (currentCount + 1).toString());
+};
+
+// Calculate critical hit bonus based on luck and ring
+const critical_hit_bonus = (base_damage: number, ring: Item | null): number => {
+  let total = 0;
+
+  total = base_damage;
+
+  // Titanium Ring gives 3% bonus per level on critical hits
+  if (ring && ItemUtils.getItemName(ring.id) === "Titanium Ring" && total > 0) {
+    const ringLevel = calculateLevel(ring.xp);
+    total += Math.floor((total * 3 * ringLevel) / 100);
+  }
+  return total;
+};
+
+// Calculate weapon special bonus based on matching specials
+const calculateWeaponSpecialBonus = (weaponId: number, weaponLevel: number, itemSpecialsSeed: number, beastPrefix: string | null, beastSuffix: string | null, baseDamage: number, ring: Item) => {
+  if (!beastPrefix && !beastSuffix) return 0;
+
+  const weaponSpecials = ItemUtils.getSpecials(weaponId, weaponLevel, itemSpecialsSeed);
+
+  let bonus = 0;
+  // Special2 (prefix) match gives 8x damage
+  if (weaponSpecials.prefix && weaponSpecials.prefix === beastPrefix) {
+    bonus += baseDamage * 8;
+  }
+  // Special3 (suffix) match gives 2x damage
+  if (weaponSpecials.suffix && weaponSpecials.suffix === beastSuffix) {
+    bonus += baseDamage * 2;
+  }
+
+  // Platinum Ring gives 3% bonus per level on special matches
+  if (ItemUtils.getItemName(ring.id) === "Platinum Ring" && bonus > 0) {
+    const ringLevel = calculateLevel(ring.xp);
+    bonus += Math.floor((bonus * 3 * ringLevel) / 100);
+  }
+
+  return bonus;
+};
+
+export const calculateAttackDamage = (weapon: Item, adventurer: Adventurer, beast: Beast | null) => {
+  if (!weapon) return { baseDamage: MIN_DAMAGE, criticalDamage: MIN_DAMAGE }; // Minimum damage
+
+  const weaponLevel = calculateLevel(weapon.xp);
+  const weaponTier = ItemUtils.getItemTier(weapon.id);
+  const baseAttack = weaponLevel * (6 - Number(weaponTier));
+
+  if (!beast) {
+    let strBonus = Math.floor(baseAttack * (adventurer.stats.strength / 10));
+    return {
+      baseDamage: baseAttack + strBonus,
+      criticalDamage: (baseAttack * 2) + strBonus,
+    };
+  }
+
+  let baseArmor = 0;
+  let elementalDamage = 0;
+
+  const beastLevel = beast.level;
+  const weaponType = ItemUtils.getItemType(weapon.id);
+  const beastArmor = getArmorType(beast.id);
+
+  baseArmor = beastLevel * (6 - Number(beast.tier));
+  elementalDamage = elementalAdjustedDamage(baseAttack, weaponType, beastArmor);
+
+  // Calculate strength bonus
+  let strengthBonus = 0;
+  if (adventurer.stats.strength > 0) {
+    strengthBonus = Math.floor((elementalDamage * adventurer.stats.strength * 10) / 100);
+  }
+
+  // Calculate special name bonus damage with ring bonus
+  const ring = adventurer.equipment.ring;
+  const specialBonus = calculateWeaponSpecialBonus(weapon.id, weaponLevel, adventurer.item_specials_seed, beast.specialPrefix, beast.specialSuffix, elementalDamage, ring);
+
+  // Calculate base damage (without critical)
+  const baseDamage = Math.max(MIN_DAMAGE, (elementalDamage + strengthBonus + specialBonus) - baseArmor);
+
+  // Calculate critical hit bonus with ring bonus using adventurer's luck stat
+  const critBonus = critical_hit_bonus(elementalDamage, ring);
+  let criticalDamage = Math.max(MIN_DAMAGE, (elementalDamage + strengthBonus + specialBonus + critBonus) - baseArmor);
+
+  return {
+    baseDamage,
+    criticalDamage,
+  }
+};
+
+export const ability_based_percentage = (adventurer_xp: number, relevant_stat: number) => {
   let adventurer_level = calculateLevel(adventurer_xp);
 
   if (relevant_stat >= adventurer_level) {
@@ -59,18 +142,18 @@ export const ability_based_percentage = (adventurer_xp: number, relevant_stat: n
   } else {
     return Math.floor((relevant_stat / adventurer_level) * 100);
   }
-};
+}
 
-export const ability_based_avoid_threat = (adventurer_level: number, relevant_stat: number, rnd: number): boolean => {
+export const ability_based_avoid_threat = (adventurer_level: number, relevant_stat: number, rnd: number) => {
   if (relevant_stat >= adventurer_level) {
     return true;
   } else {
     let scaled_chance = (adventurer_level * rnd) / 255;
     return relevant_stat > scaled_chance;
   }
-};
+}
 
-export const ability_based_damage_reduction = (adventurer_xp: number, relevant_stat: number): number => {
+export const ability_based_damage_reduction = (adventurer_xp: number, relevant_stat: number) => {
   let adventurer_level = calculateLevel(adventurer_xp);
   const SCALE = 1_000_000;
 
@@ -84,82 +167,193 @@ export const ability_based_damage_reduction = (adventurer_xp: number, relevant_s
   let smooth = 3 * r2 - 2 * r3;
 
   return Math.floor((100 * smooth / SCALE));
-};
+}
 
-export const strength_dmg = (damage: number, strength: number): number => {
-  if (strength === 0) return 0;
-  return (damage * strength * 10) / 100;
-};
+export const calculateBeastDamage = (beast: Beast, adventurer: Adventurer, armor: Item) => {
+  const baseAttack = beast.level * (6 - Number(beast.tier));
+  let baseDamage = baseAttack;
+  let critDamage = baseAttack;
 
-// Critical hit bonus calculation
-export const critical_hit_bonus = (base_damage: number, ringId: number, ringXp: number, ringName?: string): number => {
-  let total = base_damage;
+  if (armor) {
+    const armorLevel = calculateLevel(armor.xp);
+    const armorValue = armorLevel * (6 - ItemUtils.getItemTier(armor.id));
 
-  // Titanium Ring gives 3% bonus per level on critical hits
-  if ((ringName && ringName.includes("Titanium Ring")) || ringId === 7) {
-    const ringLevel = calculateLevel(ringXp);
-    total += Math.floor((total * 3 * ringLevel) / 100);
+    // Apply elemental adjustment
+    const beastAttackType = getAttackType(beast.id);
+    const armorType = ItemUtils.getItemType(armor.id);
+    let elementalDamage = elementalAdjustedDamage(baseAttack, beastAttackType, armorType);
+    let damage = elementalDamage;
+
+    // Apply name match bonus
+    if (beast.specialPrefix && beast.specialSuffix) {
+      const itemSpecials = ItemUtils.getSpecials(armor.id, armorLevel, adventurer.item_specials_seed);
+      if (itemSpecials.suffix === beast.specialSuffix) {
+        damage += elementalDamage * 2; // Suffix match
+      }
+      if (itemSpecials.prefix === beast.specialPrefix) {
+        damage += elementalDamage * 8; // Prefix match
+      }
+
+    }
+
+    critDamage = Math.max(BEAST_MIN_DAMAGE, (damage + elementalDamage) - armorValue);
+    baseDamage = Math.max(BEAST_MIN_DAMAGE, damage - armorValue);
+
+    // Check for neck armor reduction
+    const neck = adventurer.equipment.neck;
+    if (neck_reduction(armor, neck)) {
+      const neckLevel = calculateLevel(neck.xp);
+      const neckReduction = Math.floor((armorLevel * (6 - ItemUtils.getItemTier(armor.id)) * neckLevel * 3) / 100);
+
+      baseDamage -= neckReduction;
+      critDamage -= neckReduction;
+    }
+  } else {
+    baseDamage = Math.floor(baseAttack * 1.5);
+    critDamage = Math.floor(baseAttack * 1.5) * 2;
   }
-  return total;
+
+  return {
+    baseDamage: Math.max(BEAST_MIN_DAMAGE, baseDamage),
+    criticalDamage: Math.max(BEAST_MIN_DAMAGE, critDamage),
+  }
 };
 
 // Check if neck item provides bonus armor reduction
-export const neck_reduction = (armorType: string, neckName: string): boolean => {
-  if (!armorType || !neckName) return false;
+const neck_reduction = (armor: Item, neck: Item): boolean => {
+  if (!armor.id || !neck.id) return false;
 
-  if (armorType === "Cloth" && neckName === "Amulet") return true;
-  if (armorType === "Hide" && neckName === "Pendant") return true;
-  if (armorType === "Metal" && neckName === "Necklace") return true;
+  if (ItemUtils.getItemType(armor.id) === ItemType.Cloth && ItemUtils.getItemName(neck.id) === "Amulet") return true;
+  if (ItemUtils.getItemType(armor.id) === ItemType.Hide && ItemUtils.getItemName(neck.id) === "Pendant") return true;
+  if (ItemUtils.getItemType(armor.id) === ItemType.Metal && ItemUtils.getItemName(neck.id) === "Necklace") return true;
 
   return false;
 };
 
-// Calculate flee chance based on dexterity
-export const calculateFleeChance = (adventurerLevel: number, dexterity: number): number => {
-  if (dexterity >= adventurerLevel) {
-    return 100;
+export function elementalAdjustedDamage(base_attack: number, weapon_type: string, armor_type: string): number {
+  let elemental_effect = Math.floor(base_attack / 2);
+
+  if (
+    (weapon_type === ItemType.Magic && armor_type === "Metal") ||
+    (weapon_type === ItemType.Blade && armor_type === "Cloth") ||
+    (weapon_type === ItemType.Bludgeon && armor_type === "Hide")
+  ) {
+    return base_attack + elemental_effect;
   }
-  return Math.floor((dexterity / adventurerLevel) * 100);
-};
 
-// Calculate ambush chance based on wisdom
-// Chance to avoid ambush (client parity via ability_based_percentage)
-export const calculateAmbushChance = (adventurerLevel: number, wisdom: number): number => {
-  if (wisdom >= adventurerLevel) {
-    return 100;
+  if (
+    (weapon_type === ItemType.Magic && armor_type === "Hide") ||
+    (weapon_type === ItemType.Blade && armor_type === "Metal") ||
+    (weapon_type === ItemType.Bludgeon && armor_type === "Cloth")
+  ) {
+    return base_attack - elemental_effect;
   }
-  return Math.floor((wisdom / adventurerLevel) * 100);
-};
 
-// Calculate discovery chance based on intelligence
-export const calculateDiscoveryChance = (adventurerLevel: number, intelligence: number): number => {
-  return ability_based_percentage(adventurerLevel * adventurerLevel, intelligence);
-};
+  return base_attack;
+}
 
-// Calculate obstacle dodge chance based on intelligence for magic obstacles, wisdom for others
-export const calculateObstacleDodgeChance = (adventurerXp: number, intelligence: number, wisdom: number, obstacleType: string): number => {
-  if (obstacleType === "Magic") {
-    return ability_based_percentage(adventurerXp, intelligence);
+export function strength_dmg(damage: number, strength: number): number {
+  if (strength == 0) return 0;
+  return (damage * strength * 10) / 100;
+}
+
+
+// Calculate combat stats
+export const calculateCombatStats = (adventurer: Adventurer, bagItems: Item[], beast: Beast | null): CombatStats => {
+  let { baseDamage, criticalDamage } = calculateAttackDamage(adventurer.equipment.weapon, adventurer, beast);
+
+  let protection = 0;
+  let bestProtection = 0;
+  let bestItems: Item[] = [];
+
+  let bestWeapon = adventurer.equipment.weapon;
+  let bestDamage = baseDamage;
+
+  if (beast) {
+    let totalDefense = 0;
+    let totalBestDefense = 0;
+    let maxDamage = beast.level * (6 - Number(beast.tier)) * 1.5;
+
+    bagItems.filter((item) => ItemUtils.getItemSlot(item.id) === 'Weapon').forEach((item) => {
+      let itemDamage = calculateAttackDamage(item, adventurer, beast).baseDamage;
+      if (itemDamage > bestDamage) {
+        bestDamage = itemDamage;
+        bestWeapon = item;
+      }
+    });
+
+    if (bestWeapon) {
+      bestItems.push(bestWeapon)
+    }
+
+    ['head', 'chest', 'waist', 'hand', 'foot'].forEach((slot) => {
+      const armor = adventurer.equipment[slot as keyof Equipment];
+      let armorDefense = 0;
+
+      if (armor.id !== 0) {
+        armorDefense = Math.max(0, maxDamage - calculateBeastDamage(beast, adventurer, armor).baseDamage);
+      }
+
+      let bestDefense = armorDefense;
+      let bestItem = null;
+      bagItems.filter((item) => ItemUtils.getItemSlot(item.id).toLowerCase() === slot).forEach((item) => {
+        let itemDefense = Math.max(0, maxDamage - calculateBeastDamage(beast, adventurer, item).baseDamage);
+        if (itemDefense > bestDefense) {
+          bestDefense = itemDefense;
+          bestItem = item;
+        }
+      });
+
+      totalDefense += armorDefense;
+      totalBestDefense += bestDefense;
+
+      if (bestItem) {
+        bestItems.push(bestItem);
+      }
+    });
+
+    if (maxDamage <= 2) {
+      protection = 100;
+      bestProtection = 100;
+    } else {
+      protection = Math.floor((totalDefense / ((maxDamage - BEAST_MIN_DAMAGE) * 5)) * 100);
+      bestProtection = Math.floor((totalBestDefense / ((maxDamage - BEAST_MIN_DAMAGE) * 5)) * 100);
+    }
   }
-  return ability_based_percentage(adventurerXp, wisdom);
-};
 
-// XP rewards
-export const calculateXpReward = (beastLevel: number, beastTier: number): number => {
-  const MIN_XP_REWARD = 4;
-  return Math.max(MIN_XP_REWARD, beastLevel * 2);
-};
+  let gearScore = 0;
+  Object.values(adventurer.equipment).forEach((item) => {
+    if (item.id !== 0) {
+      gearScore += calculateLevel(item.xp) * (6 - ItemUtils.getItemTier(item.id));
+    }
+  });
 
-export const calculateGoldReward = (beastLevel: number, beastTier: number): number => {
-  const GOLD_MULTIPLIER: Record<number, number> = {
-    1: 5, // T1
-    2: 4, // T2
-    3: 3, // T3
-    4: 2, // T4
-    5: 1, // T5
+  bagItems.forEach((item) => {
+    if (item.id !== 0) {
+      gearScore += calculateLevel(item.xp) * (6 - ItemUtils.getItemTier(item.id));
+    }
+  });
+
+  return {
+    baseDamage,
+    protection,
+    bestDamage,
+    bestProtection,
+    bestItems,
+    critChance: adventurer.stats.luck,
+    criticalDamage,
+    gearScore,
   };
-  const GOLD_REWARD_DIVISOR = 2;
-  
-  const multiplier = GOLD_MULTIPLIER[beastTier] || 1;
-  return Math.floor(beastLevel * multiplier / GOLD_REWARD_DIVISOR);
+};
+
+export const calculateGoldReward = (beast: Beast, ring: Item | null) => {
+  let goldReward = Math.floor(beast.level * (6 - Number(beast.tier)) / 2);
+
+  // Gold Ring gives 3% bonus per level on gold reward
+  if (ring && ItemUtils.getItemName(ring.id) === "Gold Ring" && goldReward > 0) {
+    const ringLevel = calculateLevel(ring.xp);
+    goldReward += Math.floor((goldReward * 3 * ringLevel) / 100);
+  }
+
+  return goldReward;
 };

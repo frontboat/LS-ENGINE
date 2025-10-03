@@ -58,6 +58,7 @@ export class ContextEngine {
   <equipment weapon="${formatEquip(adventurer.equipment.weapon)}" chest="${formatEquip(adventurer.equipment.chest)}" head="${formatEquip(adventurer.equipment.head)}" waist="${formatEquip(adventurer.equipment.waist)}" foot="${formatEquip(adventurer.equipment.foot)}" hand="${formatEquip(adventurer.equipment.hand)}" neck="${formatEquip(adventurer.equipment.neck)}" ring="${formatEquip(adventurer.equipment.ring)}"/>
   <beast name="${beast?.name || 'Unknown'}" health="${beast?.health || 0}" level="${beast?.level || 1}" tier="${beast?.tier || 0}"/>
   <damage player="${combatPreview?.playerDamage.base || 0}" critical="${combatPreview?.playerDamage.critical || 0}" beast="${combatPreview?.beastDamage.max || 0}"/>
+  <collectable shiny="${combatPreview?.collectable?.shiny ?? false}" animated="${combatPreview?.collectable?.animated ?? false}" eligible="${combatPreview?.collectable?.eligible ?? false}"/>
   <flee chance="${combatPreview?.fleeChance || 0}"/>
   <estimate>${combatPreview?.outcome || 'Unknown'}</estimate>
 </context>`;

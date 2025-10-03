@@ -34,8 +34,6 @@ export const battleContext = context({
     state.memory.adventurerSummary = [
       `Health: ${adventurer.health}/${maxHealth}`,
       `Level: ${adventurer.level}`,
-      `Gold: ${adventurer.gold}`,
-      `Stats => STR:${adventurer.stats.strength} DEX:${adventurer.stats.dexterity} VIT:${adventurer.stats.vitality} INT:${adventurer.stats.intelligence} WIS:${adventurer.stats.wisdom} CHA:${adventurer.stats.charisma} LUK:${adventurer.stats.luck}`,
     ].join(' | ');
 
     const equipmentEntries = Object.entries(adventurer.equipment).map(([slot, item]) => {
@@ -65,11 +63,11 @@ export const battleContext = context({
 
     if (gameState.combatPreview) {
       const preview = gameState.combatPreview;
+      const fleePercent = preview.fleeChance > 1 ? preview.fleeChance : preview.fleeChance * 100;
       state.memory.combatSummary = [
         `Player Damage => base:${preview.playerDamage.base}, crit:${preview.playerDamage.critical}`,
         `Beast Damage => max:${preview.beastDamage.max}`,
-        `Flee Chance: ${(preview.fleeChance * 100).toFixed(0)}%`,
-        `Ambush Chance: ${(preview.ambushChance * 100).toFixed(0)}%`,
+        `Flee Chance: ${Math.round(fleePercent)}%`,
         `Outcome: ${preview.outcome}`,
       ].join(' | ');
     } else {

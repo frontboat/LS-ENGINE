@@ -4,10 +4,13 @@
  * One query gets everything from the denormalized database
  */
 
-import { BEAST_NAMES, BEAST_NAME_PREFIXES, BEAST_NAME_SUFFIXES } from '../constants/beast';
+import { BEAST_MIN_DAMAGE, BEAST_NAMES, BEAST_NAME_PREFIXES, BEAST_NAME_SUFFIXES } from '../constants/beast';
 import { ItemId, ITEM_NAME_PREFIXES, ITEM_NAME_SUFFIXES } from '../constants/loot';
 import { OBSTACLE_NAMES } from '../constants/obstacle';
-import { elementalAdjustedDamage } from '../utils/game';
+import { calculateCombatStats, calculateBeastDamage as computeBeastDamage } from '../utils/game';
+import { getCollectableTraits } from '../utils/beast';
+import { ItemUtils } from '../utils/loot';
+import type { Adventurer as UtilsAdventurer, Beast as UtilsBeast, Item as UtilsItem, Equipment as UtilsEquipment } from '../types/game';
 
 export interface GameStateConfig {
   toriiUrl: string;
@@ -100,6 +103,7 @@ export class GameStateService {
         gold: row['details.adventurer.gold'] || 0,
         beastHealth: row['details.adventurer.beast_health'] || 0,
         statUpgradesAvailable: row['details.adventurer.stat_upgrades_available'] || 0,
+        itemSpecialsSeed: row['details.adventurer.item_specials_seed'] || 0,
         
         stats: {
           strength: row['details.adventurer.stats.strength'] || 0,
@@ -130,7 +134,7 @@ export class GameStateService {
     
     // Add combat calculations if in battle
     if (state.beast) {
-      state.combatPreview = this.calculateCombatPreview(state.adventurer, state.beast);
+      state.combatPreview = this.calculateCombatPreview(state.adventurer, state.beast, state.bag);
     }
     
     return state;
@@ -178,16 +182,19 @@ export class GameStateService {
     const level = row['details.beast.level'] || 1;
     const special2 = row['details.beast.specials.special2'];
     const special3 = row['details.beast.specials.special3'];
+    const currentHealth = row['details.adventurer.beast_health'];
+    const isCollectable = row['details.beast.is_collectable'];
     
     const beast: Beast = {
       id,
-      health,
+      health: currentHealth && currentHealth > 0 ? currentHealth : health,
       level,
       seed: row['details.beast.seed'] || '0x0',
       name: BEAST_NAMES[id] || `Beast ${id}`,
       tier: this.getBeastTier(id),
       type: this.getBeastType(id),
-      armorType: this.getBeastArmorType(id)
+      armorType: this.getBeastArmorType(id),
+      isCollectable: Boolean(isCollectable)
     };
     
     // Add special names if level 19+
@@ -377,95 +384,167 @@ export class GameStateService {
   /**
    * Calculate combat preview
    */
-  private calculateCombatPreview(adventurer: Adventurer, beast: Beast): CombatPreview {
-    const weapon = adventurer.equipment.weapon;
-    const MIN_DAMAGE = 4;
-    
-    if (!weapon) {
-      const outcome = this.estimateCombatOutcome(
-        adventurer, beast, MIN_DAMAGE, MIN_DAMAGE * 2, MIN_DAMAGE
-      );
-      
-      return {
-        playerDamage: { base: MIN_DAMAGE, critical: MIN_DAMAGE * 2 },
-        beastDamage: { max: MIN_DAMAGE },
-        fleeChance: this.calculateFleeChance(adventurer),
-        ambushChance: this.calculateAmbushChance(adventurer),
-        outcome
-      };
+  private calculateCombatPreview(adventurer: Adventurer, beast: Beast, bag: Item[]): CombatPreview {
+    const utilsAdventurer = this.toUtilsAdventurer(adventurer);
+    const utilsBag = this.toUtilsBag(bag);
+    const utilsBeast = this.toUtilsBeast(beast);
+
+    const combatStats = calculateCombatStats(utilsAdventurer, utilsBag, utilsBeast);
+    const collectableEligible = (utilsBeast.isCollectable ?? false) && utilsBeast.seed !== 0n;
+    const collectableTraits = collectableEligible
+      ? getCollectableTraits(utilsBeast.seed)
+      : { shiny: false, animated: false };
+
+    const baseDamage = Math.max(1, Math.round(combatStats.baseDamage));
+    const criticalDamage = Math.max(baseDamage, Math.round(combatStats.criticalDamage));
+    const critChance = Math.min(100, Math.max(0, Math.round(combatStats.critChance ?? 0)));
+
+    const armorSlots: Array<keyof UtilsEquipment> = ['head', 'chest', 'waist', 'hand', 'foot'];
+    const beastBaseAttack = utilsBeast.level * (6 - Number(utilsBeast.tier));
+    let totalBeastDamage = 0;
+    let highestBeastDamage = BEAST_MIN_DAMAGE;
+
+    for (const slot of armorSlots) {
+      const armor = utilsAdventurer.equipment[slot];
+      if (armor && armor.id !== 0) {
+        const slotDamage = Math.max(
+          BEAST_MIN_DAMAGE,
+          Math.round(computeBeastDamage(utilsBeast, utilsAdventurer, armor).baseDamage)
+        );
+        totalBeastDamage += slotDamage;
+        if (slotDamage > highestBeastDamage) {
+          highestBeastDamage = slotDamage;
+        }
+      } else {
+        const unarmoredDamage = Math.max(BEAST_MIN_DAMAGE, Math.floor(beastBaseAttack * 1.5));
+        totalBeastDamage += unarmoredDamage;
+        if (unarmoredDamage > highestBeastDamage) {
+          highestBeastDamage = unarmoredDamage;
+        }
+      }
     }
-    
-    // Player damage calculation
-    const weaponDamage = weapon.level * (6 - weapon.tier);
-    const weaponType = this.getWeaponType(weapon.id);
-    const elementalDamage = elementalAdjustedDamage(weaponDamage, weaponType, beast.armorType);
-    const strengthBonus = Math.floor((elementalDamage * adventurer.stats.strength * 10) / 100);
-    
-    // Check for special name matches
-    let specialBonus = 0;
-    if (weapon.prefix && beast.prefix && weapon.prefix === beast.prefix) {
-      specialBonus += elementalDamage * 8; // 8x for prefix match
-    }
-    if (weapon.suffix && beast.suffix && weapon.suffix === beast.suffix) {
-      specialBonus += elementalDamage * 2; // 2x for suffix match
-    }
-    
-    const beastArmor = beast.level * (6 - beast.tier);
-    const baseDamage = Math.max(MIN_DAMAGE, elementalDamage + strengthBonus + specialBonus - beastArmor);
-    const criticalDamage = Math.max(MIN_DAMAGE, (elementalDamage * 2) + strengthBonus + specialBonus - beastArmor);
-    
-    // Beast damage calculation (per-slot with elemental adjustments)
-    const actualBeastDamage = this.calculateBeastDamage(beast, adventurer);
-    
+
+    const averageBeastDamage = Math.max(
+      BEAST_MIN_DAMAGE,
+      Math.round(totalBeastDamage / armorSlots.length)
+    );
+
+    const averagePlayerDamage = Math.max(
+      1,
+      baseDamage + ((critChance / 100) * (criticalDamage - baseDamage))
+    );
+
     const outcome = this.estimateCombatOutcome(
-      adventurer, beast, baseDamage, criticalDamage, actualBeastDamage
+      adventurer,
+      beast,
+      averagePlayerDamage,
+      averageBeastDamage
     );
 
     return {
       playerDamage: { base: baseDamage, critical: criticalDamage },
-      beastDamage: { max: actualBeastDamage },
+      beastDamage: { max: highestBeastDamage },
       fleeChance: this.calculateFleeChance(adventurer),
       ambushChance: this.calculateAmbushChance(adventurer),
-      outcome
+      collectable: {
+        shiny: collectableTraits.shiny,
+        animated: collectableTraits.animated,
+        eligible: collectableEligible,
+      },
+      outcome,
     };
+  }
+
+  private toUtilsItem(item: Item | null): UtilsItem {
+    return item
+      ? { id: item.id, xp: item.xp }
+      : { id: 0, xp: 0 };
+  }
+
+  private toUtilsEquipment(equipment: Adventurer['equipment']): UtilsEquipment {
+    return {
+      weapon: this.toUtilsItem(equipment.weapon),
+      chest: this.toUtilsItem(equipment.chest),
+      head: this.toUtilsItem(equipment.head),
+      waist: this.toUtilsItem(equipment.waist),
+      foot: this.toUtilsItem(equipment.foot),
+      hand: this.toUtilsItem(equipment.hand),
+      neck: this.toUtilsItem(equipment.neck),
+      ring: this.toUtilsItem(equipment.ring),
+    };
+  }
+
+  private toUtilsAdventurer(adventurer: Adventurer): UtilsAdventurer {
+    return {
+      health: adventurer.health,
+      xp: adventurer.xp,
+      gold: adventurer.gold,
+      beast_health: adventurer.beastHealth,
+      stat_upgrades_available: adventurer.statUpgradesAvailable,
+      stats: { ...adventurer.stats },
+      equipment: this.toUtilsEquipment(adventurer.equipment),
+      item_specials_seed: adventurer.itemSpecialsSeed,
+      action_count: 0,
+    };
+  }
+
+  private toUtilsBeast(beast: Beast): UtilsBeast {
+    let seedValue = 0n;
+    if (beast.seed) {
+      try {
+        seedValue = BigInt(beast.seed);
+      } catch {
+        seedValue = 0n;
+      }
+    }
+
+    return {
+      id: beast.id,
+      seed: seedValue,
+      baseName: beast.name,
+      name: beast.name,
+      health: beast.health,
+      level: beast.level,
+      type: beast.type,
+      tier: beast.tier,
+      specialPrefix: beast.prefix ?? null,
+      specialSuffix: beast.suffix ?? null,
+      isCollectable: beast.isCollectable ?? false,
+    };
+  }
+
+  private toUtilsBag(bag: Item[]): UtilsItem[] {
+    return bag.map((item) => ({ id: item.id, xp: item.xp }));
   }
 
   /**
    * Estimate combat outcome assuming alternating turns (adventurer first)
    */
   private estimateCombatOutcome(
-    adventurer: Adventurer, 
-    beast: Beast, 
-    playerBaseDamage: number, 
-    playerCritDamage: number,
+    adventurer: Adventurer,
+    beast: Beast,
+    averagePlayerDamage: number,
     beastDamage: number
   ): string {
     const adventurerHealth = adventurer.health;
     const beastHealth = beast.health;
-    const critChance = (adventurer.stats.strength + adventurer.stats.dexterity + adventurer.stats.intelligence) / 3;
-    
-    // Estimate average player damage (accounting for crit chance)
-    const avgPlayerDamage = playerBaseDamage + ((critChance / 100) * (playerCritDamage - playerBaseDamage));
-    
-    // Calculate rounds needed to kill beast
-    const roundsToKillBeast = Math.ceil(beastHealth / avgPlayerDamage);
-    
-    // Calculate rounds adventurer can survive (beast only attacks if adventurer doesn't kill it)
+
+    const adjustedPlayerDamage = Math.max(1, averagePlayerDamage);
+    const roundsToKillBeast = Math.max(1, Math.ceil(beastHealth / adjustedPlayerDamage));
     const roundsToKillAdventurer = beastDamage > 0 ? Math.ceil(adventurerHealth / beastDamage) : Infinity;
-    
+
     if (roundsToKillBeast <= roundsToKillAdventurer) {
-      // Adventurer wins - calculate damage taken
-      const beastAttackRounds = Math.max(0, roundsToKillBeast - 1); // Beast doesn't attack if killed on turn 1
+      const beastAttackRounds = Math.max(0, roundsToKillBeast - 1);
       const damageTaken = beastAttackRounds * beastDamage;
-      
+
       if (damageTaken === 0) {
         return `Win in ${roundsToKillBeast} round${roundsToKillBeast === 1 ? '' : 's'}, no damage`;
-      } else {
-        return `Win in ${roundsToKillBeast} round${roundsToKillBeast === 1 ? '' : 's'}, take ${damageTaken} damage`;
       }
-    } else {
-      return `Lose in ${roundsToKillAdventurer} round${roundsToKillAdventurer === 1 ? '' : 's'}`;
+
+      return `Win in ${roundsToKillBeast} round${roundsToKillBeast === 1 ? '' : 's'}, take ${damageTaken} damage`;
     }
+
+    return `Lose in ${roundsToKillAdventurer} round${roundsToKillAdventurer === 1 ? '' : 's'}`;
   }
 
   /**
@@ -510,8 +589,8 @@ export class GameStateService {
   
   
   private calculatePrice(itemId: number, charisma: number): number {
-    const tier = this.getItemTier(itemId);
-    const basePrice = [20, 16, 12, 8, 4][tier - 1] || 4;
+    const tier = ItemUtils.getItemTier(itemId);
+    const basePrice = ItemUtils.getItemBasePrice(tier);
     const discount = charisma;
     return Math.max(1, basePrice - discount);
   }
@@ -523,16 +602,28 @@ export class GameStateService {
   
   private getItemTier(id: number): number {
     if (id <= 0) return 5;
-    
+
+    // Necklaces (ids 1-3) are Tier 1
+    if (id >= 1 && id <= 3) return 1;
+
+    // Silver Ring (id 4) is Tier 2
+    if (id === 4) return 2;
+
+    // Bronze Ring (id 5) is Tier 3
+    if (id === 5) return 3;
+
+    // Other rings (6-8) are Tier 1
+    if (id >= 6 && id <= 8) return 1;
+
     // T1 items
     if ([9, 13, 17, 22, 27, 32, 37, 42, 47, 52, 57, 62, 67, 72, 77, 82, 87, 92, 97].includes(id)) return 1;
-    
+
     // T2 items
-    if ([10, 14, 18, 23, 28, 33, 38, 43, 48, 53, 58, 63, 68, 73, 78, 83, 88, 93, 98, 4].includes(id)) return 2;
-    
+    if ([10, 14, 18, 23, 28, 33, 38, 43, 48, 53, 58, 63, 68, 73, 78, 83, 88, 93, 98].includes(id)) return 2;
+
     // T3 items
-    if ([11, 15, 19, 24, 29, 34, 39, 44, 49, 54, 59, 64, 69, 74, 79, 84, 89, 94, 99, 5].includes(id)) return 3;
-    
+    if ([11, 15, 19, 24, 29, 34, 39, 44, 49, 54, 59, 64, 69, 74, 79, 84, 89, 94, 99].includes(id)) return 3;
+
     // T4 items
     if ([20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100].includes(id)) return 4;
     
@@ -606,101 +697,9 @@ export class GameStateService {
   }
   
   /**
-   * Calculate beast damage with per-slot calculation and elemental adjustments
-   */
-  private calculateBeastDamage(beast: Beast, adventurer: Adventurer): number {
-    const armorSlots = ['head', 'chest', 'waist', 'hand', 'foot'] as const;
-    const beastAttackType = beast.type; // Now using correct attack type (Magic/Blade/Bludgeon)
-    
-    // Calculate damage against each armor slot
-    let totalDamage = 0;
-    let armorCount = 0;
-    
-    for (const slot of armorSlots) {
-      const armor = adventurer.equipment[slot];
-      if (armor) {
-        const damageAgainstArmor = this.calculateBeastDamageAgainstArmor(
-          armor, beast, beastAttackType, adventurer.equipment.neck
-        );
-        totalDamage += damageAgainstArmor;
-        armorCount++;
-      }
-    }
-    
-    // Average the damage across all armor slots (divide by 5, not by armorCount)
-    const averageDamage = Math.floor(totalDamage / 5);
-    
-    const BEAST_MIN_DAMAGE = 2;
-    return Math.max(BEAST_MIN_DAMAGE, averageDamage);
-  }
-  
-  /**
-   * Calculate beast damage against a single armor item with elemental adjustments
-   */
-  private calculateBeastDamageAgainstArmor(
-    armor: Item, 
-    beast: Beast, 
-    beastAttackType: string,
-    neck: Item | null
-  ): number {
-    const beastLevel = beast.level;
-    const beastTier = beast.tier;
-    let damage = beastLevel * (6 - beastTier);
-    
-    // Apply elemental adjustment (beast attack type vs armor type)
-    const armorType = this.getArmorType(armor.id);
-    damage = elementalAdjustedDamage(damage, beastAttackType, armorType);
-    
-    // Apply name match bonus (item specials vs beast specials)
-    if (armor.suffix && beast.suffix && armor.suffix === beast.suffix) {
-      damage *= 2; // Suffix match
-    }
-    if (armor.prefix && beast.prefix && armor.prefix === beast.prefix) {
-      damage *= 8; // Prefix match
-    }
-    
-    // Subtract armor value
-    const armorLevel = armor.level;
-    const armorValue = armorLevel * (6 - armor.tier);
-    damage = Math.max(2, damage - armorValue);
-    
-    // Apply neck reduction bonus if applicable
-    if (neck && this.neckReductionApplies(armorType, neck.name)) {
-      const neckLevel = neck.level;
-      const reduction = Math.floor((armorLevel * (6 - armor.tier) * neckLevel * 3) / 100);
-      damage -= reduction;
-    }
-    
-    return Math.max(2, damage);
-  }
-  
-  /**
-   * Check if neck item provides reduction for this armor type
-   */
-  private neckReductionApplies(armorType: string, neckName: string): boolean {
-    if (!armorType || !neckName) return false;
-    if (armorType === 'Cloth' && neckName.includes('Amulet')) return true;
-    if (armorType === 'Hide' && neckName.includes('Pendant')) return true;
-    if (armorType === 'Metal' && neckName.includes('Necklace')) return true;
-    return false;
-  }
-  
-  /**
    * Get armor type for elemental calculations (matches ItemEntity logic)
    */
-  private getArmorType(id: number): string {
-    // Use same logic as ItemEntity.calculateType()
-    if (this.isMagicOrCloth(id)) return 'Cloth';
-    if (this.isBladeOrHide(id)) return 'Hide'; 
-    if (this.isBludgeonOrMetal(id)) return 'Metal';
-    return 'None';
-  }
-  
   // Item type classification helpers (from ItemEntity)
-  private isMagicOrCloth(id: number): boolean { return id >= 9 && id <= 41; }
-  private isBladeOrHide(id: number): boolean { return id >= 42 && id <= 71; }
-  private isBludgeonOrMetal(id: number): boolean { return id >= 72; }
-  
   private parseHexId(hexId: string): number {
     if (!hexId) return 0;
     const cleanHex = hexId.startsWith('0x') ? hexId.slice(2) : hexId;
@@ -745,6 +744,7 @@ export interface Adventurer {
   gold: number;
   beastHealth: number;
   statUpgradesAvailable: number;
+  itemSpecialsSeed: number;
   stats: {
     strength: number;
     dexterity: number;
@@ -790,6 +790,7 @@ export interface Beast {
   armorType: string;
   prefix?: string;
   suffix?: string;
+  isCollectable?: boolean;
 }
 
 export interface MarketItem {
@@ -811,6 +812,11 @@ export interface CombatPreview {
   };
   fleeChance: number;
   ambushChance: number;
+  collectable: {
+    shiny: boolean;
+    animated: boolean;
+    eligible: boolean;
+  } | null;
   outcome: string;
 }
 

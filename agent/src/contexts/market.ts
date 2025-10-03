@@ -38,11 +38,12 @@ export const marketContext = context({
 
     const marketInventory = gameState.market.filter((item) => !ownedIds.has(item.id));
 
-    state.memory.items = marketInventory.map(
+    const affordable = marketInventory.filter((item) => item.price <= gameState.adventurer.gold);
+
+    state.memory.items = affordable.map(
       (item) => `${item.name} [${item.type}] (ID ${item.id}, Slot: ${item.slot}, Tier ${item.tier}) - ${item.price}g`
     );
 
-    const affordable = marketInventory.filter((item) => item.price <= gameState.adventurer.gold);
     state.memory.affordableItems = affordable.map(
       (item) => `${item.name} [${item.type}] (ID ${item.id}, Tier ${item.tier}) for ${item.price}g`
     );
@@ -51,8 +52,8 @@ export const marketContext = context({
     state.memory.potionOffer = `Potion (heals ${POTION_HEAL_AMOUNT} HP) - ${potionCost}g`;
     state.memory.potionAffordable = potionCost <= gameState.adventurer.gold;
 
-    state.memory.items.push(state.memory.potionOffer);
     if (state.memory.potionAffordable) {
+      state.memory.items.push(state.memory.potionOffer);
       state.memory.affordableItems.push(`Potion (heals ${POTION_HEAL_AMOUNT} HP) for ${potionCost}g`);
     }
   },
@@ -60,9 +61,7 @@ export const marketContext = context({
     return [
       `Current gold: ${state.memory.gold}`,
       'Market Inventory:',
-      state.memory.items.join('\n') || 'Market stall is empty.',
-      'Affordable Items:',
-      state.memory.affordableItems.join('\n') || 'No items are currently affordable.',
+      state.memory.items.join('\n') || 'No items are currently affordable.',
       'Potion Offer:',
       state.memory.potionOffer,
       state.memory.potionAffordable ? 'Potion is affordable.' : 'Not enough gold for potion.',
