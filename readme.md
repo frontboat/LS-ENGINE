@@ -6,7 +6,8 @@ bun run index.ts <NAME> <GAME ID> "<PROMPT>"
 ```
 - `NAME` is arbitrary - solely for agent to remember you by - not linked to controller address
 - `GAME ID` is the game number that you are asking about
-- `"PROMPT"` is the prompt to send the agent, this is additional to the composed context state
+- `"PROMPT"` is the prompt to send the agent, this is additional to the composed context state.
+
 EXAMPLE: 
 ```bash
 bun run index.ts boat 21603 "Describe the current situation in 1 sentence."
@@ -22,7 +23,8 @@ ENV: `OPENROUTER_API_KEY`
 bun run index.ts
 ```
 - `GET /` - Health check
-- `GET /game/:id/context` - XML context for LLM agents
+- `GET /game/:id/context` - XML context for LLM agents.
+
 EXAMPLE:
 ```bash
 curl http://localhost:3000/game/21603/context
