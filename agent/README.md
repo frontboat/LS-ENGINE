@@ -16,31 +16,32 @@ Each context defines a `loader` that pulls fresh data before the model generates
 ## Data Flow
 
 ```mermaid
-digraph AgentContexts {
-  node [shape=rectangle, style=rounded];
+graph TD
+    subgraph cluster_session["Session Context"]
+        session_loader["Loader: hydrate game snapshot<br/>(determine phase)"]
+        session_composer["Compose contexts<br/>by phase"]
+    end
 
-  subgraph cluster_session {
-    label = "Session Context";
-    session_loader [label="Loader: hydrate game snapshot\n(determine phase)"];
-    session_composer [label="Compose contexts\nby phase"];
-  }
+    start["Start Game<br/>leaderboard snapshot"]
+    battle["Battle<br/>combat snapshot"]
+    exploration["Exploration<br/>adventurer + bag"]
+    market["Market<br/>market inventory"]
+    stat["Stat Upgrade<br/>attributes + points"]
+    agent_output["Agent Output<br/>(render prompt)"]
 
-  start [label="Start Game\nleaderboard snapshot"];
-  battle [label="Battle\ncombat snapshot"];
-  exploration [label="Exploration\nadventurer + bag"];
-  market [label="Market\nmarket inventory"];
-  stat [label="Stat Upgrade\nattributes + points"];
-
-  session_loader -> session_composer;
-  session_composer -> start [label="no active game"];
-  session_composer -> battle [label="phase = combat"];
-  session_composer -> exploration [label="phase = exploration"];
-  session_composer -> market [label="exploration"];
-  session_composer -> stat [label="phase = level_up"];
-
-  exploration -> market;
-  {start battle exploration market stat} -> agent_output [label="render prompt" shape=parallelogram];
-}
+    session_loader --> session_composer
+    session_composer -->|"no active game"| start
+    session_composer -->|"phase = combat"| battle
+    session_composer -->|"phase = exploration"| exploration
+    session_composer -->|"exploration"| market
+    session_composer -->|"phase = level_up"| stat
+    
+    exploration --> market
+    start --> agent_output
+    battle --> agent_output
+    exploration --> agent_output
+    market --> agent_output
+    stat --> agent_output
 ```
 
 ## Dependencies & Shared Services
