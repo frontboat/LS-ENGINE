@@ -48,7 +48,6 @@ export const explorationContext = context({
       return `Slot ${index + 1}: ${item.name} [${item.type}] (ID ${item.id}) L${item.level} T${item.tier}`;
     });
 
-    // Leave decision making to the model; no objective recommendations here.
   },
   render: (state) => {
     return [

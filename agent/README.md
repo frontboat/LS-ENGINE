@@ -46,7 +46,7 @@ graph TD
 
 ## Dependencies & Shared Services
 
-- `@daydreamsai/core`, `@daydreamsai/ai-sdk-provider`, `@daydreamsai/chromadb` (installed via `bun install`).
+- `@daydreamsai/core`, `@openrouter/ai-sdk-provider` (installed via `bun install`).
 - Shared game-state wrapper in `agent/src/services/gameState.ts`, which reuses `engine/src/services/GameStateService.ts` for Torii queries.
 - Optional environment overrides:
   - `TORII_URL` — Torii endpoint (defaults to `https://api.cartridge.gg/x/boat-ls2-mainnet-v2/torii`).

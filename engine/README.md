@@ -11,7 +11,7 @@ bun run index.ts
 
 **Environment:**
 - `TORII_URL` - Torii indexer endpoint  
-- `NAMESPACE` - Database namespace (default: ls_0_0_6)
+- `NAMESPACE` - Database namespace (default: ls_0_0_9)
 - `PORT` - Server port (default: 3000)
 
 ## API

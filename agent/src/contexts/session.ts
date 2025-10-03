@@ -11,7 +11,7 @@ import { marketContext } from './market';
 import { startGameContext } from './startGame';
 import { statUpgradeContext } from './statUpgrade';
 
-const DEFAULT_GAME_ID = Number.parseInt(process.env.DEFAULT_GAME_ID ?? '21603', 10);
+const DEFAULT_GAME_ID = Number.parseInt(process.env.DEFAULT_GAME_ID ?? '21603', 10); //this is a gameid boat used for testing REMOVE
 
 interface SessionMemory {
   hasActiveGame: boolean;

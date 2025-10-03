@@ -6,7 +6,6 @@ node_modules
 # output
 daydreams-llm.txt
 out
-!node_modules/@daydreamsai/dist
 
 *.tgz
 
