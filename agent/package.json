@@ -1,0 +1,18 @@
+{
+  "name": "agent",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@daydreamsai/ai-sdk-provider": "^0.1.5",
+    "@daydreamsai/chromadb": "^0.3.22",
+    "@daydreamsai/core": "^0.3.22",
+    "@openrouter/ai-sdk-provider": "^1.2.0"
+  }
+}
