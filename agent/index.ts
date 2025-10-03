@@ -55,7 +55,7 @@ if (import.meta.main) {
     throw new Error(`Invalid gameId provided: ${gameIdArg}`);
   }
 
-  const prompt = process.argv.slice(4).join(' ') || 'Summarize the current situation and best moves.';
+  const prompt = process.argv.slice(4).join(' ') || 'Summarize the current situation concisely.';
 
   const run = async () => {
     await agent.start();
