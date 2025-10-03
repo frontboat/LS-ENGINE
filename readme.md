@@ -4,9 +4,9 @@
 ```bash
 bun run index.ts <NAME> <GAME ID> "<PROMPT>"
 ```
-- `NAME` IS ARBITRARY - SOLELY FOR AGENT TO REMEMBER IN MEMORY - NOT LINKED TO CONTROLLER ADDRESS
-- `GAME ID` IS THE GAME NUMBER THAT YOU ARE ASKING ABOUT
-- `"PROMPT"` IS THE PROMPT TO SEND THE AGENT, THIS IS ADDITIONAL TO THE CONTEXT
+- `NAME` is arbitrary - solely for agent to remember you by - not linked to controller address
+- `GAME ID` is the game number that you are asking about
+- `"PROMPT"` is the prompt to send the agent, this is additional to the composed context state
 EXAMPLE: 
 ```bash
 bun run index.ts boat 21603 "Describe the current situation in 1 sentence."
@@ -21,7 +21,6 @@ ENV: `OPENROUTER_API_KEY`
 ```bash
 bun run index.ts
 ```
-EXTRA API SERVER THAT IS EXPOSED ON PORT 3000
 - `GET /` - Health check
 - `GET /game/:id/context` - XML context for LLM agents
 EXAMPLE:
