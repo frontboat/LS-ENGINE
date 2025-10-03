@@ -1,5 +1,6 @@
 daydreams-llm.txt
 LS_llm.txt
+.DS_Store
 
 # dependencies (bun install)
 node_modules

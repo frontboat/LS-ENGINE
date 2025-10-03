@@ -11,8 +11,8 @@ import { ContextEngine } from './src/context/ContextEngine';
 
 // Environment configuration
 const config: GameStateConfig = {
-  toriiUrl: process.env.TORII_URL || 'https://api.cartridge.gg/x/pg-sepolia/torii',
-  namespace: process.env.NAMESPACE || 'ls_0_0_6'
+  toriiUrl: process.env.TORII_URL || 'https://api.cartridge.gg/x/boat-ls2-mainnet-v2/torii',
+  namespace: process.env.NAMESPACE || 'ls_0_0_9'
 };
 
 // Initialize app

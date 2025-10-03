@@ -34,8 +34,6 @@ bun run index.ts
 
 ## Architecture
 
-Simplified from 3000+ lines across 19 files to 800 lines across 7 files:
-
 ```
 ├── index.ts                          # Hono API server
 ├── src/services/GameStateService.ts  # Single SQL query + calculations  
