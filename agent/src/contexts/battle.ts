@@ -2,6 +2,7 @@ import { context } from '@daydreamsai/core';
 import * as z from 'zod';
 
 import { loadGameState } from '../services/gameState';
+import { calculateMaxHealth } from '../utils/derived';
 
 interface BattleMemory {
   phase: string;
@@ -29,18 +30,20 @@ export const battleContext = context({
     state.memory.phase = gameState.phase;
 
     const adventurer = gameState.adventurer;
+    const maxHealth = calculateMaxHealth(adventurer.stats.vitality);
     state.memory.adventurerSummary = [
-      `Health: ${adventurer.health}`,
+      `Health: ${adventurer.health}/${maxHealth}`,
       `Level: ${adventurer.level}`,
       `Gold: ${adventurer.gold}`,
       `Stats => STR:${adventurer.stats.strength} DEX:${adventurer.stats.dexterity} VIT:${adventurer.stats.vitality} INT:${adventurer.stats.intelligence} WIS:${adventurer.stats.wisdom} CHA:${adventurer.stats.charisma} LUK:${adventurer.stats.luck}`,
     ].join(' | ');
 
     const equipmentEntries = Object.entries(adventurer.equipment).map(([slot, item]) => {
+      const slotLabel = `${slot.charAt(0).toUpperCase()}${slot.slice(1)}`;
       if (!item) {
-        return `${slot}: None`;
+        return `${slotLabel}: None`;
       }
-      return `${slot}: ${item.name} [${item.type}] (Tier ${item.tier}, Level ${item.level})`;
+      return `${slotLabel}: ${item.name} [${item.type}] (ID ${item.id}, Tier ${item.tier}, Level ${item.level})`;
     });
     state.memory.equipmentSummary = equipmentEntries.join(' | ');
 

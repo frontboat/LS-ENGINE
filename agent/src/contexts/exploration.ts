@@ -2,6 +2,7 @@ import { context } from '@daydreamsai/core';
 import * as z from 'zod';
 
 import { loadGameState } from '../services/gameState';
+import { calculateMaxHealth } from '../utils/derived';
 
 interface ExplorationMemory {
   phase: string;
@@ -27,22 +28,24 @@ export const explorationContext = context({
     state.memory.phase = gameState.phase;
 
     const adventurer = gameState.adventurer;
+    const maxHealth = calculateMaxHealth(adventurer.stats.vitality);
     state.memory.adventurerSummary = [
-      `Health: ${adventurer.health}`,
+      `Health: ${adventurer.health}/${maxHealth}`,
       `Gold: ${adventurer.gold}`,
       `Bag slots used: ${gameState.bag.length}`,
     ].join(' | ');
 
     const equipmentEntries = Object.entries(adventurer.equipment).map(([slot, item]) => {
+      const slotLabel = `${slot.charAt(0).toUpperCase()}${slot.slice(1)}`;
       if (!item) {
-        return `${slot}: None`;
+        return `${slotLabel}: None`;
       }
-      return `${slot}: ${item.name} [${item.type}] (Tier ${item.tier}, Level ${item.level})`;
+      return `${slotLabel}: ${item.name} [${item.type}] (ID ${item.id}, Tier ${item.tier}, Level ${item.level})`;
     });
     state.memory.equipmentSummary = equipmentEntries.join(' | ');
 
     state.memory.bagSummary = gameState.bag.map((item, index) => {
-      return `Slot ${index + 1}: ${item.name} [${item.type}] L${item.level} T${item.tier}`;
+      return `Slot ${index + 1}: ${item.name} [${item.type}] (ID ${item.id}) L${item.level} T${item.tier}`;
     });
 
     // Leave decision making to the model; no objective recommendations here.

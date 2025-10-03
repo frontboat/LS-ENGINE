@@ -2,11 +2,14 @@ import { context } from '@daydreamsai/core';
 import * as z from 'zod';
 
 import { loadGameState } from '../services/gameState';
+import { potionPrice, POTION_HEAL_AMOUNT } from '../utils/derived';
 
 interface MarketMemory {
   gold: number;
   items: string[];
   affordableItems: string[];
+  potionOffer: string;
+  potionAffordable: boolean;
 }
 
 export const marketContext = context({
@@ -18,6 +21,8 @@ export const marketContext = context({
     gold: 0,
     items: [],
     affordableItems: [],
+    potionOffer: 'Potion information unavailable.',
+    potionAffordable: false,
   }),
   loader: async (state) => {
     const gameState = await loadGameState(state.args.gameId);
@@ -34,13 +39,22 @@ export const marketContext = context({
     const marketInventory = gameState.market.filter((item) => !ownedIds.has(item.id));
 
     state.memory.items = marketInventory.map(
-      (item) => `${item.name} [${item.type}] (Slot: ${item.slot}, Tier ${item.tier}) - ${item.price}g`
+      (item) => `${item.name} [${item.type}] (ID ${item.id}, Slot: ${item.slot}, Tier ${item.tier}) - ${item.price}g`
     );
 
     const affordable = marketInventory.filter((item) => item.price <= gameState.adventurer.gold);
     state.memory.affordableItems = affordable.map(
-      (item) => `${item.name} [${item.type}] (Tier ${item.tier}) for ${item.price}g`
+      (item) => `${item.name} [${item.type}] (ID ${item.id}, Tier ${item.tier}) for ${item.price}g`
     );
+
+    const potionCost = potionPrice(gameState.adventurer.level, gameState.adventurer.stats.charisma);
+    state.memory.potionOffer = `Potion (heals ${POTION_HEAL_AMOUNT} HP) - ${potionCost}g`;
+    state.memory.potionAffordable = potionCost <= gameState.adventurer.gold;
+
+    state.memory.items.push(state.memory.potionOffer);
+    if (state.memory.potionAffordable) {
+      state.memory.affordableItems.push(`Potion (heals ${POTION_HEAL_AMOUNT} HP) for ${potionCost}g`);
+    }
   },
   render: (state) => {
     return [
@@ -49,6 +63,9 @@ export const marketContext = context({
       state.memory.items.join('\n') || 'Market stall is empty.',
       'Affordable Items:',
       state.memory.affordableItems.join('\n') || 'No items are currently affordable.',
+      'Potion Offer:',
+      state.memory.potionOffer,
+      state.memory.potionAffordable ? 'Potion is affordable.' : 'Not enough gold for potion.',
     ].join('\n');
   },
 });
