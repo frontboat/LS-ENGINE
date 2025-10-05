@@ -6,9 +6,10 @@ node_modules
 # output
 daydreams-llm.txt
 out
-
+.cartridge
 *.tgz
-
+docs
+dist
 # code coverage
 coverage
 *.lcov

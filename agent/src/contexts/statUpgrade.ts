@@ -3,6 +3,7 @@ import * as z from 'zod';
 
 import { loadGameState } from '../services/gameState';
 import { calculateMaxHealth, potionPrice } from '../utils/derived';
+import { selectStatsAction, buyItemsAction } from '../actions/systemCalls';
 
 interface StatUpgradeMemory {
   availablePoints: number;
@@ -57,4 +58,4 @@ export const statUpgradeContext = context({
       `Potion price: ${state.memory.potionCost}g`,
     ].join('\n');
   },
-});
+}).setActions([selectStatsAction, buyItemsAction]);

@@ -11,6 +11,7 @@ import { openrouter } from '@openrouter/ai-sdk-provider';
 import * as z from 'zod';
 
 import { sessionContext } from './src/contexts';
+import { systemCallsService } from './src/services/systemCalls';
 
 const DEFAULT_GAME_ID = Number.parseInt(process.env.DEFAULT_GAME_ID ?? '21603', 10);
 
@@ -36,6 +37,7 @@ export const agent: Agent<typeof sessionContext> = createDreams({
   logLevel: LogLevel.INFO,
   model: openrouter('openai/gpt-5'),
   contexts: [sessionContext],
+  services: [systemCallsService],
   inputs: {
     text: textInput,
   },

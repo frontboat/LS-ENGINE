@@ -13,6 +13,12 @@ Daydreams-powered orchestration layer that prepares Loot Survivor game state via
 
 Each context defines a `loader` that pulls fresh data before the model generates a response, eliminating the need for explicit fetch actions.
 
+### On-Chain Actions
+
+- `systemCallsService` boots a Cartridge session and exposes a connected Starknet account for action handlers.
+- `src/actions/systemCalls.ts` wraps the service so contexts can invoke on-chain moves such as `explore`, `attack`, `flee`, `buy-items`, `select-stat-upgrades`, and `claim-beast`.
+- Actions are scoped to the contexts where they make sense (battle, exploration, stat-upgrade, session), keeping the LLM’s toolbox aligned with the player’s phase.
+
 ## Data Flow
 
 ```mermaid

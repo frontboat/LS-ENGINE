@@ -3,6 +3,7 @@ import * as z from 'zod';
 
 import { loadGameState } from '../services/gameState';
 import { calculateMaxHealth } from '../utils/derived';
+import { exploreAction, equipAction, dropAction, buyItemsAction, requestRandomAction } from '../actions/systemCalls';
 
 interface ExplorationMemory {
   phase: string;
@@ -60,4 +61,4 @@ export const explorationContext = context({
       state.memory.bagSummary.join('\n') || 'Bag is empty.',
     ].join('\n');
   },
-});
+}).setActions([exploreAction, equipAction, dropAction, buyItemsAction, requestRandomAction]);

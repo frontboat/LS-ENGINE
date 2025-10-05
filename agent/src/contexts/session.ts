@@ -10,6 +10,7 @@ import { explorationContext } from './exploration';
 import { marketContext } from './market';
 import { startGameContext } from './startGame';
 import { statUpgradeContext } from './statUpgrade';
+import { startGameAction, claimSurvivorTokensAction, mintGameAction } from '../actions/systemCalls';
 
 const DEFAULT_GAME_ID = Number.parseInt(process.env.DEFAULT_GAME_ID ?? '21603', 10); //this is a gameid boat used for testing REMOVE
 
@@ -71,7 +72,9 @@ export const sessionContext = context({
       `Phase: ${state.memory.phase}.`,
     ].join('\n');
   },
-}).use((state) => {
+})
+  .setActions([startGameAction, claimSurvivorTokensAction, mintGameAction])
+  .use((state) => {
   const contexts: Array<{ context: any; args: any }> = [];
 
   if (!state.memory.hasActiveGame || state.memory.phase === 'start') {

@@ -4,13 +4,20 @@
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/node": "^24.6.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.7.3"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
+    "@cartridge/controller": "^0.10.7",
+    "@cartridge/controller-wasm": "^0.3.10",
     "@daydreamsai/core": "^0.3.22",
-    "@openrouter/ai-sdk-provider": "^1.2.0"
+    "@dojoengine/core": "^1.7.4",
+    "@openrouter/ai-sdk-provider": "^1.2.0",
+    "starknet": "^7.6.4"
   }
 }

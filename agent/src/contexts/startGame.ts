@@ -2,6 +2,7 @@ import { context } from '@daydreamsai/core';
 import * as z from 'zod';
 
 import { loadLeaderboard } from '../services/gameState';
+import { mintGameAction } from '../actions/systemCalls';
 
 interface StartGameMemory {
   leaderboard: string[];
@@ -28,4 +29,4 @@ export const startGameContext = context({
       state.memory.leaderboard.join('\n') || 'No completed runs recorded yet.',
     ].join('\n');
   },
-});
+}).setActions([mintGameAction]);

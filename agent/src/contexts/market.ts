@@ -3,6 +3,7 @@ import * as z from 'zod';
 
 import { loadGameState } from '../services/gameState';
 import { potionPrice, POTION_HEAL_AMOUNT } from '../utils/derived';
+import { buyItemsAction } from '../actions/systemCalls';
 
 interface MarketMemory {
   gold: number;
@@ -67,4 +68,4 @@ export const marketContext = context({
       state.memory.potionAffordable ? 'Potion is affordable.' : 'Not enough gold for potion.',
     ].join('\n');
   },
-});
+}).setActions([buyItemsAction]);

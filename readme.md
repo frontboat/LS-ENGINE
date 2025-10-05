@@ -32,3 +32,63 @@ curl http://localhost:3000/game/21603/context
 ```xml
 <context><phase>combat</phase><adventurer health="99" level="4" gold="4" xp="19"/><stats str="4" dex="3" vit="2" int="1" wis="1" cha="4"/><equipment weapon="Ghost Wand:L3:T1" chest="Shirt:L3:T5" head="Helm:L3:T5" waist="Linen Sash:L3:T4" foot="Divine Slippers:L3:T1" hand="Leather Gloves:L3:T5" neck="None" ring="None"/><beast name="Wolf" health="21" level="12" tier="5"/><damage player="4" critical="7" beast="15"/><collectable shiny="false" animated="false" eligible="false"/><flee chance="75"/><estimate>Win in 6 rounds, take 40 damage</estimate></context>
 ```
+
+## Directory Structure
+
+```bash
+.
+├── agent
+│   ├── README.md
+│   ├── bun.lock
+│   ├── index.ts
+│   ├── package.json
+│   ├── src
+│   │   ├── actions
+│   │   │   └── systemCalls.ts
+│   │   ├── contexts
+│   │   │   ├── battle.ts
+│   │   │   ├── exploration.ts
+│   │   │   ├── index.ts
+│   │   │   ├── market.ts
+│   │   │   ├── session.ts
+│   │   │   ├── startGame.ts
+│   │   │   └── statUpgrade.ts
+│   │   ├── services
+│   │   │   ├── gameState.ts
+│   │   │   └── systemCalls.ts
+│   │   └── utils
+│   │       └── derived.ts
+│   └── tsconfig.json
+├── engine
+│   ├── AGENTS.md
+│   ├── CLAUDE.md
+│   ├── README.md
+│   ├── bun.lock
+│   ├── index.ts
+│   ├── manifest_mainnet.json
+│   ├── manifest_sepolia.json
+│   ├── manifest_slot.json
+│   ├── package.json
+│   ├── src
+│   │   ├── constants
+│   │   │   ├── beast.ts
+│   │   │   ├── game.ts
+│   │   │   ├── loot.ts
+│   │   │   └── obstacle.ts
+│   │   ├── context
+│   │   │   └── ContextEngine.ts
+│   │   ├── services
+│   │   │   └── GameStateService.ts
+│   │   ├── types
+│   │   │   └── game.ts
+│   │   └── utils
+│   │       ├── beast.ts
+│   │       ├── events.ts
+│   │       ├── game.ts
+│   │       ├── loot.ts
+│   │       ├── networkConfig.ts
+│   │       ├── translation.ts
+│   │       └── utils.ts
+│   └── tsconfig.json
+└── readme.md
+```

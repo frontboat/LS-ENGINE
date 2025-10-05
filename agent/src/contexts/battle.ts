@@ -3,6 +3,7 @@ import * as z from 'zod';
 
 import { loadGameState } from '../services/gameState';
 import { calculateMaxHealth } from '../utils/derived';
+import { attackAction, fleeAction, claimBeastAction, requestRandomAction } from '../actions/systemCalls';
 
 interface BattleMemory {
   phase: string;
@@ -87,4 +88,4 @@ export const battleContext = context({
       state.memory.combatSummary,
     ].join('\n');
   },
-});
+}).setActions([attackAction, fleeAction, claimBeastAction, requestRandomAction]);
